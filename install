@@ -1,0 +1,105 @@
+#!/bin/bash
+
+#sudo sed -i 's,http://.*ubuntu.com,http://old-releases.ubuntu.com,g' /etc/apt/sources.list
+sudo apt-get -y update
+#apt-get install openssh-server
+#apt-get -y install ntp
+#apt-get -y install patch
+apt-get -y install vim
+apt-get -y install software-properties-common python-software-properties
+apt-get -y install nginx php7.0 php7.0-mysql php7.0-fpm php7.0-mbstring php7.0-xml php7.0-curl php7.0-zip
+apt-get -y install mysql-client mysql-server
+mysql_secure_installation
+apt-get -y install phpmyadmin php-mbstring php-gettext
+phpenmod mcrypt
+phpenmod mbstring
+
+#apt-get -y install php7.0-fpm php7.0-mysql
+#apt-get -y install phppgadmin
+#apt-get -y install postgresql
+#apt-get install rrdtool perl libwww-perl libmailtools-perl libmime-lite-perl librrds-perl  libxml-simple-perl libhttp-server-simple-perl libconfig-general-perl libdbi-perl libnet-daemon-perl libplrpc-perl
+
+#####################################################################
+# Cleanup install package
+
+echo ‘cgi.fix_pathinfo=0’ >> /etc/php/7.0/fpm/php.ini
+
+mv /etc/nginx/sites-available/default /etc/nginx/sites-available/default_bak
+
+cat <<EOF > /etc/nginx/sites-available/default
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server ipv6only=on;
+    
+    root /var/www/html/public;
+    index index.php index.html index.htm;
+    
+    server_name localhost;
+    charset   utf-8;
+    
+    gzip on;
+    gzip_vary on;
+    gzip_disable "msie6";
+    gzip_comp_level 6;
+    gzip_min_length 1100;
+    gzip_buffers 16 8k;
+    gzip_proxied any;
+    gzip_types
+        text/plain
+        text/css
+        text/js
+        text/xml
+        text/javascript
+        application/javascript
+        application/x-javascript
+        application/json
+        application/xml
+        application/xml+rss;
+        
+    location / {
+        try_files \$uri \$uri/ /index.php?\$query_string;
+    }
+    
+    location ~ \.php\$ {
+        try_files \$uri /index.php =404;
+        fastcgi_split_path_info ^(.+\.php)(/.+)\$;
+        fastcgi_pass unix:/run/php/php7.0-fpm.sock;
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+        include fastcgi_params;
+    }
+    
+    location ~* \.(?:jpg|jpeg|gif|png|ico|cur|gz|svg|svgz|mp4|ogg|ogv|webm|htc|svg|woff|woff2|ttf)\$ {
+      expires 1M;
+      access_log off;
+      add_header Cache-Control "public";
+    }
+    
+    location ~* \.(?:css|js)\$ {
+      expires 7d;
+      access_log off;
+      add_header Cache-Control "public";
+    }
+    
+    location ~ /\.ht {
+        deny  all;
+    }
+    
+}
+EOF
+
+#mkdir -p /var/www/html
+/etc/init.d/nginx restart
+/etc/init.d/php7.0-fpm restart
+
+cd ~
+curl -sS https://getcomposer.org/installer | php
+mv composer.phar /usr/local/bin/composer
+cd /var/www/html
+#rm -f index.nginx-debian.html 
+composer create-project laravel/laravel .
+
+chown -R www-data:www-data /var/www/html
+chmod -R 775 /var/www/html/storage
+
+sudo ln -s /usr/share/phpmyadmin /var/www/html/public/
